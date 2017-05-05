@@ -8,7 +8,7 @@ const mongoose = require('mongoose');
 const should = chai.should();
 
 const {DATABASE_URL} = require('../config');
-const {BlogPost} = require('../models');
+const {BlogPost, User} = require('../models');
 const {closeServer, runServer, app} = require('../server');
 const {TEST_DATABASE_URL} = require('../config');
 
@@ -23,7 +23,7 @@ function tearDownDb() {
     console.warn('Deleting database');
     mongoose.connection.dropDatabase()
       .then(result => resolve(result))
-      .catch(err => reject(err))
+      .catch(err => reject(err));
   });
 }
 
@@ -54,26 +54,29 @@ function seedUserData() {
   console.log('seeding user data');
 
   const sampleUser = {
-        username: 'user1',
-        firstName: 'Bob',
-        lastName: 'user',
-        password: '123'};
+    username: 'user1',
+    firstName: 'Bob',
+    lastName: 'user',
+    password: '123'};
     
-    return User.hashPassword(sampleUser.password)
+  return User.hashPassword(sampleUser.password)
     .then(hash => {
-    return User
+      return User
       .create({
         username: 'user1',
         firstName: 'Bob',
         lastName: 'user',
         password: hash
-      })
+      });
     })
-    .then(user => {
-      testUser.username = user.username;
+    .then(result => {
+      testUser.username = result.username;
       testUser.password = sampleUser.password;
-      return end();
-    })
+      testUser.firstName = result.firstName;
+      testUser.lastName = result.lastName;
+      return true;
+    });
+}
 
   
 
@@ -87,9 +90,21 @@ describe('blog posts API resource', function() {
     return runServer(TEST_DATABASE_URL);
   });
 
+  // beforeEach(function(){
+  //   return seedUserData();
+  // });
+
   beforeEach(function() {
-    return seedBlogPostData();
+    let p1 = new Promise((resolve, reject) => {
+        return seedUserData();
+
+      });
+    let p2 = new Promise((resolve, reject) => {
+      return seedBlogPostData();
+    });
+    Promise.all([p1, p2]);
   });
+
 
   afterEach(function() {
     // tear down database so we ensure no state from this test
@@ -106,6 +121,9 @@ describe('blog posts API resource', function() {
   // on proving something small
   describe('GET endpoint', function() {
 
+    // beforeEach(function(){
+    //   return seedUserData();
+    // });
     it('should return all existing posts', function() {
       // strategy:
       //    1. get back all posts returned by by GET request to `/posts`
@@ -161,6 +179,11 @@ describe('blog posts API resource', function() {
   });
 
   describe('POST endpoint', function() {
+
+    // beforeEach(function(){
+    //   return seedUserData();
+    // });
+
     // strategy: make a POST request with data,
     // then prove that the post we get back has
     // right keys, and that `id` is there (which means
@@ -168,17 +191,18 @@ describe('blog posts API resource', function() {
     it('should add a new blog post', function() {
 
       const newPost = {
-          title: faker.lorem.sentence(),
-          author: {
-            firstName: faker.name.firstName(),
-            lastName: faker.name.lastName(),
-          },
-          content: faker.lorem.text()
+        title: faker.lorem.sentence(),
+        author: {
+          firstName: testUser.firstName,
+          lastName: testUser.lastName,
+        },
+        content: faker.lorem.text()
       };
 
       return chai.request(app)
         .post('/posts')
         .send(newPost)
+        .auth(testUser.username, testUser.password)
         .then(function(res) {
           res.should.have.status(201);
           res.should.be.json;
@@ -204,6 +228,9 @@ describe('blog posts API resource', function() {
 
   describe('PUT endpoint', function() {
 
+    // beforeEach(function(){
+    //   return seedUserData();
+    // });
     // strategy:
     //  1. Get an existing post from db
     //  2. Make a PUT request to update that post
@@ -214,8 +241,8 @@ describe('blog posts API resource', function() {
         title: 'cats cats cats',
         content: 'dogs dogs dogs',
         author: {
-          firstName: 'foo',
-          lastName: 'bar'
+          firstName: testUser.firstName,
+          lastName: testUser.lastName
         }
       };
 
@@ -227,15 +254,16 @@ describe('blog posts API resource', function() {
 
           return chai.request(app)
             .put(`/posts/${post.id}`)
-            .send(updateData);
+            .send(updateData)
+            .auth(testUser.username, testUser.password);
         })
         .then(res => {
           res.should.have.status(201);
           res.should.be.json;
           res.body.should.be.a('object');
           res.body.title.should.equal(updateData.title);
-          res.body.author.should.equal(
-            `${updateData.author.firstName} ${updateData.author.lastName}`);
+          // res.body.author.should.equal( this test should never work - the put endpoint should never update user data, only title and content
+          //   `${updateData.author.firstName} ${updateData.author.lastName}`);
           res.body.content.should.equal(updateData.content);
 
           return BlogPost.findById(res.body.id).exec();
@@ -243,13 +271,16 @@ describe('blog posts API resource', function() {
         .then(post => {
           post.title.should.equal(updateData.title);
           post.content.should.equal(updateData.content);
-          post.author.firstName.should.equal(updateData.author.firstName);
-          post.author.lastName.should.equal(updateData.author.lastName);
+          // post.author.firstName.should.equal(updateData.author.firstName);
+          // post.author.lastName.should.equal(updateData.author.lastName);
         });
     });
   });
 
   describe('DELETE endpoint', function() {
+    // beforeEach(function(){
+    //   return seedUserData();
+    // });
     // strategy:
     //  1. get a post
     //  2. make a DELETE request for that post's id
@@ -264,7 +295,7 @@ describe('blog posts API resource', function() {
         .exec()
         .then(_post => {
           post = _post;
-          return chai.request(app).delete(`/posts/${post.id}`);
+          return chai.request(app).delete(`/posts/${post.id}`).auth(testUser.username, testUser.password);
         })
         .then(res => {
           res.should.have.status(204);
