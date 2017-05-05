@@ -50,6 +50,7 @@ function seedBlogPostData() {
   return BlogPost.insertMany(seedData);
 }
 const testUser = {};
+
 function seedUserData() {
   console.log('seeding user data');
 
@@ -95,14 +96,7 @@ describe('blog posts API resource', function() {
   // });
 
   beforeEach(function() {
-    let p1 = new Promise((resolve, reject) => {
-        return seedUserData();
-
-      });
-    let p2 = new Promise((resolve, reject) => {
-      return seedBlogPostData();
-    });
-    Promise.all([p1, p2]);
+    Promise.all([seedUserData(), seedBlogPostData()]);
   });
 
 
