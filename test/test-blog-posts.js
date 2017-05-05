@@ -304,4 +304,59 @@ describe('blog posts API resource', function() {
         });
     });
   });
+  describe('POST users', function(){
+    let testPost = {
+      username: 'frank',
+      password: 'franklin',
+      firstName: 'Francis',
+      lastName: 'Frankfurt'
+    };
+    it('should post a user to the database', function(){
+      return chai.request(app).post('/users').send(testPost)
+      .then(result =>{
+        // console.log(result);
+        return User
+        .findOne({'username': testPost.username})
+        .exec();
+      })
+      .then(result =>{
+        console.log(result);
+        result.firstName.should.equal(testPost.firstName);
+      });
+    });
+  });
+  describe('authentication should reject bad inputs', function(){
+    
+    it('should not allow access to bad password', function(){
+      let testPostId ='';
+      BlogPost
+      .findOne()
+      .exec()
+      .then(result =>{
+        testPostId = result.id;
+        console.log(testPostId);
+        return chai.request(app)
+      .put(`/posts/${testPostId}`)
+      .auth('herp', 'derp')
+      .send({
+        username: 'frank',
+        password: 'franklin',
+        firstName: 'Francis',
+        lastName: 'Frankfurt'
+      });
+      })
+    .then(result => {
+      result.should.not.exist();
+      result.should.have.status(500);
+    });
+    });
+    
+    
+    
+        //       return chai.request(app)
+        //     .put(`/posts/${post.id}`)
+        //     .send(updateData)
+        //     .auth(testUser.username, testUser.password);
+        // })
+  });
 });
