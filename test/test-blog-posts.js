@@ -49,6 +49,36 @@ function seedBlogPostData() {
   // this will return a promise
   return BlogPost.insertMany(seedData);
 }
+const testUser = {};
+function seedUserData() {
+  console.log('seeding user data');
+
+  const sampleUser = {
+        username: 'user1',
+        firstName: 'Bob',
+        lastName: 'user',
+        password: '123'};
+    
+    return User.hashPassword(sampleUser.password)
+    .then(hash => {
+    return User
+      .create({
+        username: 'user1',
+        firstName: 'Bob',
+        lastName: 'user',
+        password: hash
+      })
+    })
+    .then(user => {
+      testUser.username = user.username;
+      testUser.password = sampleUser.password;
+      return end();
+    })
+
+  
+
+  
+
 
 
 describe('blog posts API resource', function() {
